@@ -6,7 +6,7 @@ this program renders a jinja template with given data; data may be read from a
 file, or defined as command line arguments; either template or data file may be
 stdin; output file may be stdout;
 
-supported data formats: ini, json, xml, yaml;
+supported data formats: ini, json, xml, yaml, tsv, csv;
 
 ## install
 
@@ -21,6 +21,10 @@ to render a jinja template with data in json format:
 to use a different data format:
 
     # jinja -d {data} -f {data_format} {template}
+
+to use a specific [csv dialect][dialect]:
+
+    # jinja -d {data} -f csv.{dialect} {template}
 
 to read template from stdin:
 
@@ -58,6 +62,12 @@ output:
 
     sheep eat grass;
 
+## misc
+
+if the input data's top-level element is not a dict (as with tsv/csv,
+which result in a list), it will be passed to the template with the
+default variable name 'data'.
+
 ## license
 
 Copyright (C) 2018 Cyker Way
@@ -76,4 +86,4 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 [jinja]: http://jinja.pocoo.org/
-
+[dialects]: https://docs.python.org/3/library/csv.html#csv.Dialect

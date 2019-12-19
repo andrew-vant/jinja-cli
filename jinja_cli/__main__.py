@@ -14,6 +14,7 @@ import argparse
 import argparse_ext
 import configparser
 import json
+import logging
 import os
 import sys
 import xmltodict
@@ -21,6 +22,8 @@ import yaml
 
 ##  program name;
 prog = 'jinja'
+
+logging.basicConfig(level=logging.INFO)
 
 def load_data_ini(fin):
 
@@ -96,6 +99,36 @@ def load_data_yaml(fin):
 
     return yaml.safe_load(fin)
 
+
+def load_data_dsv(fin, dialect='excel', has_headers=True):
+    '''
+    load delimiter-separated-values data;
+
+    ##  params
+
+    fin:file object
+    :   data file object;
+    dialect:str;
+    :   name of registered csv dialect
+    has_headers:str;
+    :   whether columns have headers
+    '''
+
+    # Register a couple dialects of our own. User can pass in any of
+    # the builtin dialects too.
+    default_dialect_args = dict(
+        quoting=csv.QUOTE_NONE,
+        escapechar='\\',
+        strict=True
+        )
+    csv.register_dialect('tsv', delimiter='\t', **dialect_args)
+    csv.register_dialect('csv', delimiter=',', **dialect_args)
+
+    cls_reader = csv.DictReader if has_headers else csv.reader
+    reader = cls_reader(fin, dialect=dialect, **dialect_options)
+    return list(reader)
+
+
 def load_data(fname, fmt, defines):
 
     '''
@@ -136,6 +169,10 @@ def load_data(fname, fmt, defines):
                     fmt = 'xml'
                 elif fname.endswith('.yaml'):
                     fmt = 'yaml'
+                elif fname.endswith('.tsv'):
+                    fmt = 'tsv'
+                elif fname.endswith('.csv'):
+                    fmt = 'csv'
                 else:
                     raise Exception('no data format;')
 
@@ -148,11 +185,30 @@ def load_data(fname, fmt, defines):
                 data = load_data_xml(fin)
             elif fmt == 'yaml':
                 data = load_data_yaml(fin)
+            elif fmt == 'tsv':
+                data = load_data_dsv(fin, dialect='tsv')
+            elif fmt == 'csv':
+                data = load_data_dsv(fin, dialect='csv')
+            elif fmt.startswith('csv.'):
+                # allows the use of arbitrary stdlib csv dialects
+                dialect = fmt.partition('.')[-1]
+                data = load_data_dsv(fin, dialect)
             else:
                 raise Exception('invalid data format: {};'.format(fmt))
 
         finally:
             fin.close()
+
+    # csv/tsv return a list of dicts rather than a single dict, but the
+    # jinja context expects a dict, so make it one if necessary. (this
+    # will also work for json/yaml if the top-level structure isn't a
+    # dict)
+
+    if not isinstance(data, collections.Mapping):
+        top_key = 'data'
+        msg = "input doesn't provide top-level keys; using '%s'"
+        logging.info(msg, top_key)
+        data = {top_key: data}
 
     ##  merge in command line data;
     if defines is not None:
